@@ -16,27 +16,30 @@ export default function ServerList(): JSX.Element {
     const prevServerCountRef = useRef(0);
 
     const loadServerList = useCallback(async (): Promise<void> => {
-        const channels = await client.queryChannels({
-            type: 'messaging',
-            members: { $in: [client.userID as string] },
-        });
-        const serverSet: Set<DiscordServer> = new Set(
-            channels
-                .map((channel: Channel) => ({
-                    // @ts-expect-error: Accessing channel data properties
-                    id: channel.data?.data?.id,
-                    // @ts-expect-error: Channel server name may not be a string
-                    name: (channel.data?.data?.server as string) ?? 'Unknown',
-                    // @ts-expect-error: Channel image may not be defined
-                    image: channel.data?.data?.image,
-                }))
-                .filter((server: DiscordServer) => server.name !== 'Unknown')
-                .filter(
-                    (server: DiscordServer, index: number, self: DiscordServer[]) =>
-                        index === self.findIndex((s) => s.name === server.name)
-                )
+        const channels = await client.queryChannels(
+            {
+                type: 'messaging',
+                members: { $in: [client.userID as string] },
+            },
+            {},
+            { limit: 300 }
         );
-        const serverArray = Array.from(serverSet.values());
+        const serverMap = new Map<string, DiscordServer>();
+        for (const channel of channels) {
+            const data = (channel.data as Record<string, any>)?.data || (channel.data as Record<string, any>);
+            const name = typeof data?.server === 'string' ? data.server.trim() : null;
+            if (name && name !== 'Unknown') {
+                const key = name.toLowerCase();
+                if (!serverMap.has(key)) {
+                    serverMap.set(key, {
+                        id: data?.serverId || data?.id || name,
+                        name: name,
+                        image: (data?.image as string) || '',
+                    });
+                }
+            }
+        }
+        const serverArray = Array.from(serverMap.values());
         setServerList(serverArray);
 
         if (serverArray.length > 0 && prevServerCountRef.current === 0) {
@@ -54,7 +57,7 @@ export default function ServerList(): JSX.Element {
         return () => clearInterval(interval);
     }, [loadServerList]);
 
-    // React immediately when a new server is created (serverListVersion bumps)
+    // React immediately when a new server is created or deleted (serverListVersion bumps)
     useEffect(() => {
         if (serverListVersion > 0) {
             loadServerList();

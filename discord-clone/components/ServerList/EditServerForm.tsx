@@ -50,13 +50,15 @@ export default function EditServerForm(): JSX.Element {
         setSaving(true);
         try {
             // Query all channels belonging to this server
-            const channels = await client.queryChannels({
-                type: 'messaging',
-                members: { $in: [client.userID] },
-            });
-            const serverChannels = channels.filter(
-                (c) => (c.data as Record<string, any>)?.data?.server === server.name
+            const channels = await client.queryChannels(
+                { type: 'messaging', members: { $in: [client.userID] } },
+                {},
+                { limit: 300 }
             );
+            const serverChannels = channels.filter((c) => {
+                const d = (c.data as Record<string, any>)?.data || (c.data as Record<string, any>);
+                return d?.server === server.name || (server.id && d?.serverId === server.id);
+            });
 
             // Update each channel's data with the new name/image
             for (const ch of serverChannels) {

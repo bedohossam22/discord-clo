@@ -68,25 +68,35 @@ export const DiscordContextProvider: any = ({
             if (!server){
                 filters.member_count = 2;
             }
-            const channels = await client.queryChannels(filters);
+            const channels = await client.queryChannels(filters, {}, { limit: 300 });
             const channelsByCategories = new Map<
             string,
             Array<Channel<DefaultStreamChatGenerics>>
             >();
             if (server){
-                
+                const getChannelServer = (ch: Channel) => {
+                    const d = (ch.data as Record<string, any>)?.data || (ch.data as Record<string, any>);
+                    return { name: d?.server, id: d?.serverId };
+                };
                 const categories = new Set(
                     channels
-                        .filter((channel) => (channel.data as Record<string, any>)?.data?.server === server.name)
-                        .map((channel) => (channel.data as Record<string, any>)?.data?.category)
+                        .filter((channel) => {
+                            const info = getChannelServer(channel);
+                            return info.name === server.name || (server.id && info.id === server.id);
+                        })
+                        .map((channel) => {
+                            const d = (channel.data as Record<string, any>)?.data || (channel.data as Record<string, any>);
+                            return d?.category;
+                        })
                         .filter(Boolean)
                 );
                 for (const category of Array.from(categories)){
                     channelsByCategories.set(
                         category as string,
                         channels.filter((channel) => {
-                            const data = (channel.data as Record<string, any>)?.data;
-                            return data?.server === server.name && data?.category === category;
+                            const info = getChannelServer(channel);
+                            const d = (channel.data as Record<string, any>)?.data || (channel.data as Record<string, any>);
+                            return (info.name === server.name || (server.id && info.id === server.id)) && d?.category === category;
                         })
                     );
                 }
@@ -220,18 +230,21 @@ export const DiscordContextProvider: any = ({
     const leaveServer = useCallback(
         async (client: StreamChat) => {
             if (!myState.server || !client.userID) return;
-            const serverName = myState.server.name;
+            const targetServer = myState.server;
+            const serverName = targetServer.name;
             try {
                 // First switch active server to DMs so the UI unmounts channel
                 await changeServer(undefined, client);
 
-                const channels = await client.queryChannels({
-                    type: 'messaging',
-                    members: { $in: [client.userID] },
-                });
-                const serverChannels = channels.filter(
-                    (c) => (c.data as Record<string, any>)?.data?.server === serverName
+                const channels = await client.queryChannels(
+                    { type: 'messaging', members: { $in: [client.userID] } },
+                    {},
+                    { limit: 300 }
                 );
+                const serverChannels = channels.filter((c) => {
+                    const d = (c.data as Record<string, any>)?.data || (c.data as Record<string, any>);
+                    return d?.server === serverName || (targetServer.id && d?.serverId === targetServer.id);
+                });
                 for (const ch of serverChannels) {
                     try {
                         await ch.removeMembers([client.userID]);
@@ -239,7 +252,11 @@ export const DiscordContextProvider: any = ({
                         console.warn(`[leaveServer] Failed to remove member from channel ${ch.cid}`, e);
                     }
                 }
-                setMyState((s) => ({ ...s, serverListVersion: s.serverListVersion + 1 }));
+                setMyState((s) => ({
+                    ...s,
+                    server: s.server?.name === serverName ? undefined : s.server,
+                    serverListVersion: s.serverListVersion + 1,
+                }));
                 toast.info(`You left "${serverName}"`);
             } catch (err: unknown) {
                 console.error("Failed to leave server", err);
@@ -252,7 +269,8 @@ export const DiscordContextProvider: any = ({
     const deleteServer = useCallback(
         async (client: StreamChat) => {
             if (!myState.server || !client.userID) return;
-            const serverName = myState.server.name;
+            const targetServer = myState.server;
+            const serverName = targetServer.name;
 
             // CRITICAL REQUIREMENT: Main server 'BB' CANNOT be deleted by anyone!
             if (serverName.trim().toLowerCase() === 'bb') {
@@ -264,14 +282,31 @@ export const DiscordContextProvider: any = ({
                 // 1. Unmount channel in UI first before deletion to avoid Stream runtime errors
                 await changeServer(undefined, client);
 
-                // 2. Query and delete channels
-                const channels = await client.queryChannels({
-                    type: 'messaging',
-                    members: { $in: [client.userID] },
+                // 2. Call admin API route to delete all server channels with full admin privileges
+                const res = await fetch('/api/delete-server', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serverName: targetServer.name, serverId: targetServer.id }),
                 });
-                const serverChannels = channels.filter(
-                    (c) => (c.data as Record<string, any>)?.data?.server === serverName
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || 'Server-side deletion failed');
+                }
+
+                // 3. Client-side fallback cleanup
+                const channels = await client.queryChannels(
+                    { type: 'messaging', members: { $in: [client.userID] } },
+                    {},
+                    { limit: 300 }
                 );
+                const serverChannels = channels.filter((c) => {
+                    const d = (c.data as Record<string, any>)?.data || (c.data as Record<string, any>);
+                    return (
+                        (typeof d?.server === 'string' && d.server.trim().toLowerCase() === serverName.trim().toLowerCase()) ||
+                        (targetServer.id && d?.serverId === targetServer.id)
+                    );
+                });
                 for (const ch of serverChannels) {
                     try {
                         await ch.delete();
@@ -279,11 +314,18 @@ export const DiscordContextProvider: any = ({
                         console.warn(`[deleteServer] Failed deleting channel ${ch.cid}`, e);
                     }
                 }
-                setMyState((s) => ({ ...s, serverListVersion: s.serverListVersion + 1 }));
+
+                // 4. Reset server in state & bump serverListVersion for instant reaction
+                setMyState((s) => ({
+                    ...s,
+                    server: s.server?.name === serverName ? undefined : s.server,
+                    serverListVersion: s.serverListVersion + 1,
+                }));
                 toast.success(`Server "${serverName}" has been deleted.`);
             } catch (err: unknown) {
                 console.error("Failed to delete server", err);
-                toast.error("Failed to delete server");
+                const msg = err instanceof Error ? err.message : "Failed to delete server";
+                toast.error(msg);
             }
         },
         [myState.server, changeServer]

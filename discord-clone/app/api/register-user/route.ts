@@ -38,7 +38,8 @@ export async function POST(request: Request){
         const channels = await serverClient.queryChannels(filter, {}, { limit: 100 });
 
         const serverChannels = channels.filter((ch) => {
-            return (ch.data as Record<string, any>)?.data?.server === AUTO_JOIN_SERVER;
+            const data = (ch.data as Record<string, any>)?.data || (ch.data as Record<string, any>);
+            return data?.server === AUTO_JOIN_SERVER;
         });
 
         if (serverChannels.length > 0) {

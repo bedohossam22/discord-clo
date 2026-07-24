@@ -38,7 +38,9 @@ export default function ChannelListTopBar({
         toast.error("Main server 'BB' cannot be deleted!");
         return;
       }
-      deleteServer(client);
+      if (confirm(`Are you sure you want to delete "${serverName}"?`)) {
+        deleteServer(client);
+      }
     } else if (optionName === 'Invite People') {
       router.push('/?invitePeople=true');
     } else if (optionName === 'Create Channel') {
