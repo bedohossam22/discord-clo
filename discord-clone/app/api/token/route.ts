@@ -11,9 +11,6 @@ export async function POST(request: Request) {
     
     console.log('[/api/token] Body:', body);
     
-    // Use the userId directly from the body
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    //ts-expect-error Necro
     const userId = body?.userId;
     if (!userId) {
         return Response.error();
