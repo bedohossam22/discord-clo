@@ -24,7 +24,7 @@ export async function POST(request: Request){
     }
 
     // 1. Upsert the user into Stream Chat
-    const user = await serverClient.upsertUser({
+    await serverClient.upsertUser({
         id: userId,
         role: 'user',
         name: mail,
@@ -34,13 +34,11 @@ export async function POST(request: Request){
     // 2. Auto-join the user to every channel in the AUTO_JOIN_SERVER
     try {
         // Query all channels for the target server using server-side admin client
-        // We filter by the custom `data.server` field stored in channel data
         const filter = { type: 'messaging' };
         const channels = await serverClient.queryChannels(filter, {}, { limit: 100 });
 
         const serverChannels = channels.filter((ch) => {
-            // @ts-ignore – custom nested data field
-            return ch.data?.data?.server === AUTO_JOIN_SERVER;
+            return (ch.data as Record<string, any>)?.data?.server === AUTO_JOIN_SERVER;
         });
 
         if (serverChannels.length > 0) {

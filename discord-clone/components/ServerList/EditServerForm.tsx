@@ -55,17 +55,15 @@ export default function EditServerForm(): JSX.Element {
                 members: { $in: [client.userID] },
             });
             const serverChannels = channels.filter(
-                // @ts-ignore
-                (c) => c.data?.data?.server === server.name
+                (c) => (c.data as Record<string, any>)?.data?.server === server.name
             );
 
             // Update each channel's data with the new name/image
             for (const ch of serverChannels) {
+                const existingData = (ch.data as Record<string, any>)?.data || {};
                 await ch.update({
-                    // @ts-ignore
                     data: {
-                        // @ts-ignore
-                        ...ch.data?.data,
+                        ...existingData,
                         server: serverName.trim(),
                         image: serverImage.trim(),
                     },

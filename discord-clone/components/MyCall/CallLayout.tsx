@@ -210,10 +210,8 @@ export default function CallLayout(): JSX.Element {
       if (call) {
         await call.sendReaction({
           type: 'reaction',
-          emoji: {
-            custom: {},
-            unicode: emoji,
-          },
+          emoji_code: emoji,
+          custom: {},
         });
       }
       toast(`${emoji} Reaction sent!`, { autoClose: 1500 });

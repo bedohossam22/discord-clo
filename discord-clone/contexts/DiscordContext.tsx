@@ -75,27 +75,19 @@ export const DiscordContextProvider: any = ({
             >();
             if (server){
                 
-                const categories = new Set (
-                    channels.filter((channel) => {
-                        //@ts-ignore
-                       return channel.data?.data?.server === server.name     
-                    })
-                  .map((channel)  => {
-                    //@ts-ignore
-                    return channel.data?.data?.category; 
-                  })
+                const categories = new Set(
+                    channels
+                        .filter((channel) => (channel.data as Record<string, any>)?.data?.server === server.name)
+                        .map((channel) => (channel.data as Record<string, any>)?.data?.category)
+                        .filter(Boolean)
                 );
                 for (const category of Array.from(categories)){
                     channelsByCategories.set(
-                        category,
-                    channels.filter((channel) => {
-                        return (
-                            //@ts-ignore
-                            channel.data?.data?.server === server.name &&
-                            //@ts-ignore
-                            channel.data?.data?.category === category
-                        )
-                    })
+                        category as string,
+                        channels.filter((channel) => {
+                            const data = (channel.data as Record<string, any>)?.data;
+                            return data?.server === server.name && data?.category === category;
+                        })
                     );
                 }
             } else {
@@ -238,7 +230,7 @@ export const DiscordContextProvider: any = ({
                     members: { $in: [client.userID] },
                 });
                 const serverChannels = channels.filter(
-                    (c) => (c.data?.data as any)?.server === serverName
+                    (c) => (c.data as Record<string, any>)?.data?.server === serverName
                 );
                 for (const ch of serverChannels) {
                     try {
@@ -278,7 +270,7 @@ export const DiscordContextProvider: any = ({
                     members: { $in: [client.userID] },
                 });
                 const serverChannels = channels.filter(
-                    (c) => (c.data?.data as any)?.server === serverName
+                    (c) => (c.data as Record<string, any>)?.data?.server === serverName
                 );
                 for (const ch of serverChannels) {
                     try {
