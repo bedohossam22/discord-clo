@@ -15,6 +15,7 @@ import { useDiscordContext } from "@/contexts/DiscordContext";
 import MyCall from "./MyCall/MyCall";
 import LoadingScreen from "./LoadingScreen";
 import UsersSidebar from "./UsersSidebar/UsersSidebar";
+import { useEffect, useRef } from "react";
 
 export default function MyChat({
     apiKey,
@@ -35,7 +36,58 @@ export default function MyChat({
         user,
         tokenOrProvider: token,
     });
-    const {callId} = useDiscordContext();
+    const { callId, setCall, server, changeServer } = useDiscordContext();
+    const handledInvite = useRef(false);
+
+    // Handle voice invite links: /?callId=xxx&serverId=yyy
+    // When someone clicks an invite link, auto-switch to the right server and join the call
+    useEffect(() => {
+        if (handledInvite.current) return;
+        if (!chatClient || !videoClient) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const inviteCallId = params.get('callId');
+        const inviteServerId = params.get('serverId');
+
+        if (!inviteCallId) return;
+        handledInvite.current = true;
+
+        // Clear the URL params without a page reload
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+
+        const joinFromInvite = async () => {
+            try {
+                // If a serverId was provided and we're not already on that server, switch to it
+                if (inviteServerId && server?.id !== inviteServerId) {
+                    // Query all channels to find the target server's info
+                    const channels = await chatClient.queryChannels(
+                        { type: 'messaging', members: { $in: [chatClient.userID as string] } },
+                        {},
+                        { limit: 300 }
+                    );
+                    const targetChannel = channels.find((ch) => {
+                        const d = (ch.data as Record<string, any>)?.data || (ch.data as Record<string, any>);
+                        return d?.serverId === inviteServerId;
+                    });
+                    if (targetChannel) {
+                        const d = (targetChannel.data as Record<string, any>)?.data || (targetChannel.data as Record<string, any>);
+                        await changeServer(
+                            { id: d.serverId, name: d.server, image: d.image ?? '' },
+                            chatClient
+                        );
+                    }
+                }
+                // Join the voice call
+                setCall(inviteCallId);
+            } catch (err) {
+                console.error('[MyChat] Failed to auto-join from invite link:', err);
+            }
+        };
+
+        joinFromInvite();
+    }, [chatClient, videoClient, server, changeServer, setCall]);
+
     if (!chatClient) {
         return <LoadingScreen message="Connecting to Chat..." submessage="Establishing secure connection with Stream Chat" />;
     }

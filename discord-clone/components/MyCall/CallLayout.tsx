@@ -92,7 +92,7 @@ export default function CallLayout(): JSX.Element {
   const [showReactions, setShowReactions] = useState(false);
 
   const inviteUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/?callId=${call?.id}`
+    ? `${window.location.origin}/?callId=${call?.id}&serverId=${server?.id}`
     : '';
 
   const copyInviteLink = () => {
