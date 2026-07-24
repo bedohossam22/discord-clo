@@ -33,26 +33,27 @@ export async function POST(request: Request){
 
     // 2. Auto-join the user to every channel in the AUTO_JOIN_SERVER
     try {
-        // Query channels belonging to the target server by filtering on the custom 'server' field
-        const filter = { type: 'messaging', 'data.server': AUTO_JOIN_SERVER } as Record<string, unknown>;
-        let channels = await serverClient.queryChannels(filter, {}, { limit: 100 });
+        // Admin client sees ALL channels; filter manually using the same dual-path
+        // accessor the client side uses: data?.data (explicit-ID channels) OR data directly
+        const allChannels = await serverClient.queryChannels({ type: 'messaging' }, {}, { limit: 200 });
 
-        // Fallback: if the typed filter returns nothing, fetch all and filter manually
-        if (channels.length === 0) {
-            const allChannels = await serverClient.queryChannels({ type: 'messaging' }, {}, { limit: 100 });
-            channels = allChannels.filter((ch) => {
-                const raw = ch.data as Record<string, unknown>;
-                // Stream server SDK exposes custom fields directly on ch.data
-                const serverName = (raw?.server ?? (raw?.data as Record<string, unknown>)?.server) as string | undefined;
-                return serverName?.trim() === AUTO_JOIN_SERVER;
-            });
-        }
+        const bbChannels = allChannels.filter((ch) => {
+            const raw = ch.data as Record<string, unknown>;
+            const nested = (raw?.data as Record<string, unknown>)?.server as string | undefined;
+            const direct = raw?.server as string | undefined;
+            const serverName = nested ?? direct;
+            return serverName?.trim() === AUTO_JOIN_SERVER;
+        });
 
-        if (channels.length > 0) {
+        console.log(
+            `[/api/register-user] Found ${bbChannels.length} BB channels out of ${allChannels.length} total`
+        );
+
+        if (bbChannels.length > 0) {
             console.log(
-                `[/api/register-user] Auto-joining user "${userId}" to ${channels.length} channels in server "${AUTO_JOIN_SERVER}"`
+                `[/api/register-user] Auto-joining user "${userId}" to ${bbChannels.length} channels in server "${AUTO_JOIN_SERVER}"`
             );
-            for (const ch of channels) {
+            for (const ch of bbChannels) {
                 await ch.addMembers([userId]);
             }
         } else {

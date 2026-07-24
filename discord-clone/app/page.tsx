@@ -65,17 +65,16 @@ getUserToken(
     });
   } else {
     if (clerkUser?.id){
-      // Ensure the user is in the default BB server (idempotent — safe for existing members)
+      const userId = clerkUser.id;
+      const userName = clerkUser?.primaryEmailAddress?.emailAddress || 'Unknown';
+      // Await rejoin so the user is a BB member BEFORE the chat client initialises
       fetch('/api/rejoin-default-server', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: clerkUser.id }),
-      }).catch((err) => console.error('[page] rejoin-default-server error:', err));
-
-      getUserToken(
-        clerkUser?.id || 'Unkown',
-        clerkUser?.primaryEmailAddress?.emailAddress || 'Unkown'
-      )
+        body: JSON.stringify({ userId }),
+      })
+        .catch((err) => console.error('[page] rejoin-default-server error:', err))
+        .finally(() => getUserToken(userId, userName));
     }
   }
 },[registerUser , clerkUser]);

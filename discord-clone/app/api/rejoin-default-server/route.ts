@@ -17,30 +17,33 @@ export async function POST(request: Request) {
     }
 
     try {
-        // Try filtered query first
-        const filter = { type: 'messaging', 'data.server': AUTO_JOIN_SERVER } as Record<string, unknown>;
-        let channels = await serverClient.queryChannels(filter, {}, { limit: 100 });
+        // Fetch ALL messaging channels (admin client sees everything)
+        // Use the same dual-path accessor the client uses: data?.data || data
+        // because channels created with an explicit ID nest custom fields under data.data
+        const allChannels = await serverClient.queryChannels({ type: 'messaging' }, {}, { limit: 200 });
 
-        // Fallback: fetch all and filter manually
-        if (channels.length === 0) {
-            const allChannels = await serverClient.queryChannels({ type: 'messaging' }, {}, { limit: 100 });
-            channels = allChannels.filter((ch) => {
-                const raw = ch.data as Record<string, unknown>;
-                const serverName = (raw?.server ?? (raw?.data as Record<string, unknown>)?.server) as string | undefined;
-                return serverName?.trim() === AUTO_JOIN_SERVER;
-            });
+        const bbChannels = allChannels.filter((ch) => {
+            const raw = ch.data as Record<string, unknown>;
+            // data?.data covers channels created with explicit IDs (createServer)
+            // raw directly covers channels created without IDs (createChannel)
+            const nested = (raw?.data as Record<string, unknown>)?.server as string | undefined;
+            const direct = raw?.server as string | undefined;
+            const serverName = nested ?? direct;
+            return serverName?.trim() === AUTO_JOIN_SERVER;
+        });
+
+        console.log(`[/api/rejoin-default-server] Found ${bbChannels.length} BB channels out of ${allChannels.length} total`);
+
+        if (bbChannels.length === 0) {
+            return Response.json({ message: `No channels found in server "${AUTO_JOIN_SERVER}"`, totalQueried: allChannels.length });
         }
 
-        if (channels.length === 0) {
-            return Response.json({ message: `No channels found in server "${AUTO_JOIN_SERVER}"` });
-        }
-
-        for (const ch of channels) {
+        for (const ch of bbChannels) {
             await ch.addMembers([userId]);
         }
 
-        console.log(`[/api/rejoin-default-server] User "${userId}" joined ${channels.length} channels in "${AUTO_JOIN_SERVER}"`);
-        return Response.json({ success: true, joinedChannels: channels.length });
+        console.log(`[/api/rejoin-default-server] User "${userId}" joined ${bbChannels.length} channels in "${AUTO_JOIN_SERVER}"`);
+        return Response.json({ success: true, joinedChannels: bbChannels.length });
     } catch (err) {
         console.error('[/api/rejoin-default-server] Error:', err);
         return Response.json({ error: 'Failed to join server' }, { status: 500 });
