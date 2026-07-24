@@ -33,20 +33,26 @@ export async function POST(request: Request){
 
     // 2. Auto-join the user to every channel in the AUTO_JOIN_SERVER
     try {
-        // Query all channels for the target server using server-side admin client
-        const filter = { type: 'messaging' };
-        const channels = await serverClient.queryChannels(filter, {}, { limit: 100 });
+        // Query channels belonging to the target server by filtering on the custom 'server' field
+        const filter = { type: 'messaging', 'data.server': AUTO_JOIN_SERVER } as Record<string, unknown>;
+        let channels = await serverClient.queryChannels(filter, {}, { limit: 100 });
 
-        const serverChannels = channels.filter((ch) => {
-            const data = (ch.data as Record<string, any>)?.data || (ch.data as Record<string, any>);
-            return data?.server === AUTO_JOIN_SERVER;
-        });
+        // Fallback: if the typed filter returns nothing, fetch all and filter manually
+        if (channels.length === 0) {
+            const allChannels = await serverClient.queryChannels({ type: 'messaging' }, {}, { limit: 100 });
+            channels = allChannels.filter((ch) => {
+                const raw = ch.data as Record<string, unknown>;
+                // Stream server SDK exposes custom fields directly on ch.data
+                const serverName = (raw?.server ?? (raw?.data as Record<string, unknown>)?.server) as string | undefined;
+                return serverName?.trim() === AUTO_JOIN_SERVER;
+            });
+        }
 
-        if (serverChannels.length > 0) {
+        if (channels.length > 0) {
             console.log(
-                `[/api/register-user] Auto-joining user "${userId}" to ${serverChannels.length} channels in server "${AUTO_JOIN_SERVER}"`
+                `[/api/register-user] Auto-joining user "${userId}" to ${channels.length} channels in server "${AUTO_JOIN_SERVER}"`
             );
-            for (const ch of serverChannels) {
+            for (const ch of channels) {
                 await ch.addMembers([userId]);
             }
         } else {

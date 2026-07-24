@@ -65,6 +65,13 @@ getUserToken(
     });
   } else {
     if (clerkUser?.id){
+      // Ensure the user is in the default BB server (idempotent — safe for existing members)
+      fetch('/api/rejoin-default-server', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: clerkUser.id }),
+      }).catch((err) => console.error('[page] rejoin-default-server error:', err));
+
       getUserToken(
         clerkUser?.id || 'Unkown',
         clerkUser?.primaryEmailAddress?.emailAddress || 'Unkown'
