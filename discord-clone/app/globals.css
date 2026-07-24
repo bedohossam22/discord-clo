@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 5rem 18rem 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.rounded-icon {
+   @apply transition-all ease-in-out duration-200 aspect-square object-cover;
+   border-radius: 50%;
+}
+
+.rounded-icon:hover {
+  border-radius: 1rem;
+}
+.sidebar-icon {
+  @apply flex items-center justify-center w-full relative transition-all ease-in-out duration-200;
+}
+.sidebar-icon::before {
+  @apply transition-all duration-200 ease-in-out;
+  --content-height: 0rem;
+  --content-width: 0rem;
+  --offset: -0.4rem;
+  content: '';
+  display: block;
+  height: var(--content-height);
+  width: var(--content-width);
+  background: black;
+  position: absolute;
+  border-radius: 3px;
+  left: var(--offset);
+}
+.sidebar-icon:hover::before {
+  --content-height: 1.25rem;
+  --content-width: 0.5rem;
+  --offset: -0.15rem;
+}
+
+.sidebar-icon::before {
+  --content-height: 2rem;
+  --content-width: 0.5rem;
+  --offset: -0.15rem;
+}
+
+::backdrop {
+  background-image: linear-gradient(-45deg, #7289da , rebeccapurple);
+  opacity: 0.5;
+}
+.labelTitle {
+  @apply uppercase text-sm font-bold text-gray-600;
+}
+
+input, select {
+  @apply w-full p-2 rounded;
+}
+
+input[type='text']{
+  @apply bg-transparent outline-transparent;
+}
+input[type='text']:focus{
+  outline: none;
+}
+
+input[type='checkbox']{
+  @apply w-6 h-6;
+  accent-color: black;
+}
+
+dialog {
+  width: clamp(30rem, 50% , 50rem);
+}
+
+.discord-icon {
+  @apply bg-white p-3 w-full h-full;
+  background: url('../assets/discord-black.svg') no-repeat center center, white;
+  background-origin: content-box;
+}
+
+.discord-icon:hover {
+  background: url('../assets/discord-white.svg') no-repeat center center,
+  var(--background);
+  --offset: 1.5rem;
+  background-origin: content-box;
+}
+
+.trial {
+  font-size: 80px;
+  color: white;
+}
+
+.create-button {
+  position: relative;
+}
+
+.create-button:hover::before {
+  @apply absolute p-2 bg-white shadow-md rounded-md text-sm font-medium text-gray-500 z-10 overflow-visible;
+  content: 'Create Channel';
+  top: -44px;
+  left: -100px;
+  width: 120px;
+}
+
+.channel-container {
+  @apply relative;
+}
+.channel-container::before {
+  @apply block absolute h-2 w-3 -left-4 bg-gray-700 rounded-xl;
+  content: '';
+}
+
+.online-icon::after {
+  @apply block absolute h-4 w-4 bg-green-600 bottom-0 right-0 rounded-full border-2 border-gray-200;
+  content: '';
+}
+
+.inactive-icon::after {
+@apply block absolute h-full w-0.5 bg-red-400 rotate-45 rounded-xl m-2;
+content: '';
+}
+
+/* ---- Stream Chat Layout Overrides ---- */
+/* Force stream chat components to fill their parent containers */
+.str-chat,
+.str-chat__container {
+  height: 100% !important;
+  width: 100% !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+}
+
+.str-chat-channel {
+  height: 100% !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  display: flex !important;
+}
+
+.str-chat__channel-list {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.str-chat__main-panel,
+.str-chat__main-panel-inner {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}
+
+/* Ensure ChannelList wrapper from Stream doesn't constrain width */
+.str-chat__channel-list-react {
+  width: 100% !important;
+}
