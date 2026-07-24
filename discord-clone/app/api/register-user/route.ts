@@ -39,6 +39,8 @@ export async function POST(request: Request){
 
         const bbChannels = allChannels.filter((ch) => {
             const raw = ch.data as Record<string, unknown>;
+            // Skip distinct channels (DMs) — Stream does not allow adding members to them
+            if (raw?.distinct === true) return false;
             const nested = (raw?.data as Record<string, unknown>)?.server as string | undefined;
             const direct = raw?.server as string | undefined;
             const serverName = nested ?? direct;
@@ -54,7 +56,11 @@ export async function POST(request: Request){
                 `[/api/register-user] Auto-joining user "${userId}" to ${bbChannels.length} channels in server "${AUTO_JOIN_SERVER}"`
             );
             for (const ch of bbChannels) {
-                await ch.addMembers([userId]);
+                try {
+                    await ch.addMembers([userId]);
+                } catch (chErr) {
+                    console.warn(`[/api/register-user] Skipping channel ${ch.id}:`, (chErr as Error).message);
+                }
             }
         } else {
             console.log(
