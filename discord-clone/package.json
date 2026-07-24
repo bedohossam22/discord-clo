@@ -19,6 +19,7 @@
     "react-toastify": "^11.1.0",
     "stream-chat": "^8.42.0",
     "stream-chat-react": "^12.2.2",
+    "svix": "^1.99.1",
     "uuid": "^11.0.2",
     "vercel": "^37.14.0"
   },
